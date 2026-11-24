@@ -82,7 +82,7 @@
 <section id="game" class="screen hidden">
   <header class="topbar">
     <div class="tb-left"><span class="mini-logo">S&amp;S</span><span class="pill" id="tbRoom"></span><span class="pill" id="tbRound"></span></div>
-    <div id="turnStrip" class="turn-strip"></div>
+    <div id="turnStrip" class="turn-pill"></div>
     <div class="tb-right">
       <button class="icon-btn" data-open="rulesModal" title="Rules">📖</button>
       <button class="icon-btn" id="musicBtn" title="Music">🎵</button>
@@ -91,28 +91,49 @@
     </div>
   </header>
 
-  <div class="table">
-    <div id="opponents" class="opponents"></div>
-    <div class="center">
-      <div class="piles">
-        <div class="pile">
-          <div class="card back" id="deckCard"></div>
-          <div class="pile-label"><span id="deckCount">0</span> in deck</div>
-        </div>
-        <div class="pile">
-          <div class="card slot" id="discardCard"></div>
-          <div class="pile-label">Discard pile</div>
-        </div>
+  <main class="arena" id="arena">
+    <div class="arena-bg"></div>
+    <div class="rays"></div>
+    <div class="floor-ring"></div>
+    <div class="shards" id="shards"></div>
+    <div class="my-turn-glow"></div>
+
+    <section id="seats"></section>
+
+    <div class="center" id="center">
+      <div class="dir-ring" id="dirRing">
+        <svg viewBox="0 0 200 200" aria-hidden="true">
+          <defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff6d6" stop-opacity=".95"/><stop offset="1" stop-color="#f6c945" stop-opacity=".35"/></linearGradient></defs>
+          <circle cx="100" cy="100" r="88" fill="none" stroke="url(#ringGrad)" stroke-width="7" stroke-dasharray="120 64" stroke-linecap="round"/>
+          <path d="M188 92 l14 14 -20 4z M44 176 l-2 20 -14 -14z M24 36 l20 -2 -6 20z" fill="#fff6d6"/>
+        </svg>
       </div>
-      <div id="arena" class="arena hidden"></div>
-      <ul id="logList" class="log-list"></ul>
+      <div class="pointer off" id="pointer"><i></i></div>
+      <div class="deck" id="deckPile">
+        <div class="card s3" id="deckS3"></div><div class="card s2" id="deckS2"></div><div class="card s1" id="deckCard"></div>
+        <span class="deck-count"><span id="deckCount">0</span> left</span>
+      </div>
+      <div class="discard" id="discardWrap">
+        <div class="card slot" id="discardCard"></div>
+        <span class="deck-count">Discard</span>
+      </div>
     </div>
-    <div class="me-area" id="meArea">
-      <div class="me-info" id="meInfo"></div>
-      <div class="action-bar" id="actionBar"></div>
-      <div class="hand" id="hand"></div>
-    </div>
-  </div>
+
+    <div id="status" class="status"></div>
+    <ul id="logList" class="log-list"></ul>
+    <div id="showdown" class="showdown hidden"></div>
+
+    <section class="me" id="meArea">
+      <div class="me-seat" id="meInfo"></div>
+      <div class="me-main">
+        <div class="action-bar" id="actionBar"></div>
+        <div class="hand" id="hand"></div>
+      </div>
+    </section>
+
+    <div id="bigfx" class="bigfx"></div>
+    <div id="flyLayer" class="fly-layer"></div>
+  </main>
 </section>
 
 <!-- chat (shared by lobby + game) -->
