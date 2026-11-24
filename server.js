@@ -20,7 +20,7 @@ const TYPES = {
   stamps:   { name: 'Stamp Collection',        value: 5000,  count: 10 },
   baseball: { name: 'Baseball Cards',          value: 5000,  count: 10 },
   stocks:   { name: 'Stocks',                  value: 10000, count: 10 },
-  coins:    { name: 'Coin Collection',         value: 10000, count: 10 },
+  plane:    { name: 'Private Plane',           value: 10000, count: 10 },
   bank:     { name: 'Bank Account',            value: 10000, count: 10 },
   auto:     { name: 'Classic Auto',            value: 15000, count: 10 },
   jewels:   { name: 'Jewels',                  value: 15000, count: 10 },
@@ -156,10 +156,12 @@ function beginTurn(room) {
 function drawUp(room) {
   const hs = handSize(room);
   const n = room.players.length;
+  const draws = {};
   for (let k = 0; k < n; k++) {
     const p = room.players[(room.turn + k) % n];
-    while (p.hand.length < hs && room.deck.length) p.hand.push(room.deck.pop());
+    while (p.hand.length < hs && room.deck.length) { p.hand.push(room.deck.pop()); draws[p.id] = (draws[p.id] || 0) + 1; }
   }
+  if (Object.keys(draws).length) fx(room, { k: 'draw', draws });
 }
 function endTurn(room) {
   room.challenge = null;
@@ -306,15 +308,12 @@ function schedule(room) {
   const ch = room.challenge;
   if (ch) {
     const r = P(room, ch.toRespond);
-    const valid = r.hand.filter((c) => cardBeats(c, ch.type));
+    // Same timer whether or not they can answer, so nobody can tell what's in their hand.
     if (r.bot || !r.connected) {
       room.timer = setTimeout(() => safe(room, () => botRespond(room, r)), (1300 + Math.random() * 900) * SPEED);
-    } else if (!valid.length) {
-      room.deadline = Date.now() + 2200 * SPEED;
-      room.timer = setTimeout(() => safe(room, () => { log(room, `${r.name} has nothing to fight back with.`, 'info'); resolveChallenge(room, r.id); }), 2200 * SPEED);
     } else {
       room.deadline = Date.now() + 25000;
-      room.timer = setTimeout(() => safe(room, () => { log(room, `${r.name} ran out of time.`, 'info'); resolveChallenge(room, r.id); }), 25000);
+      room.timer = setTimeout(() => safe(room, () => { log(room, `${r.name} let the clock run out.`, 'info'); resolveChallenge(room, r.id); }), 25000);
     }
     return;
   }
