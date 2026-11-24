@@ -58,9 +58,6 @@
     const b = $('#turnBanner');
     b.textContent = text; b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
   }
-  function bigFx(html, cls) {
-    $('#bigFx').innerHTML = `<div class="b ${cls}">${html}</div>`;
-  }
   function flashTitle(on) {
     clearInterval(titleFlash);
     document.title = 'Stack & Snatch';
@@ -279,7 +276,7 @@
     }
     const wasMine = prev && prev.state === 'playing' && prev.turnId === prev.me && !prev.challenge;
     if (myTurn() && !wasMine) {
-      banner('YOUR TURN!'); Sound.play('yourTurn'); vibrate([60, 40, 60]);
+      bigPop({ glyph: 'YOUR TURN!', small: true, sound: 'yourTurn' }); vibrate([60, 40, 60]);
       if (document.hidden || !document.hasFocus()) flashTitle(true);
     }
     if (!myTurn() && !iRespond()) flashTitle(false);
@@ -287,40 +284,169 @@
     if (iRespond() && !wasResp) {
       const ch = st.challenge;
       const other = player(ch.attacker === st.me ? ch.defender : ch.attacker);
-      banner(ch.defender === st.me ? 'DEFEND!' : 'FIGHT BACK!');
+      bigPop({ glyph: ch.defender === st.me ? 'DEFEND!' : 'FIGHT BACK!', small: true, cls: 'red', sound: 'yourTurn' });
       vibrate([100, 50, 100]);
       if (document.hidden) flashTitle(true);
       // auto-select if exactly one valid card
       const valid = st.hand.filter((c) => isWild(c) || c.t === ch.type);
       selected = valid.length === 1 ? [valid[0].id] : [];
-      if (!valid.length) toast(`No ${TYPES[ch.type].name} or wilds — ${esc(other.name)} takes it…`);
+      if (!valid.length) toast(`You have no ${TYPES[ch.type].name} or wilds — tap <b>Give up</b> (only you can see this)`);
     }
   }
 
+  // ---------------- big pop-ups (queued so they never overlap)
+  const popQueue = [];
+  let popBusy = false;
+  function bigPop(o) { popQueue.push(o); if (!popBusy) nextPop(); }
+  function nextPop() {
+    const o = popQueue.shift();
+    if (!o) { popBusy = false; return; }
+    popBusy = true;
+    $('#bigfx').innerHTML = '';
+    const el = document.createElement('div');
+    el.className = 'pop ' + (o.cls || '');
+    el.innerHTML = `${o.glyph ? `<span class="glyph" ${o.small ? 'style="font-size:min(92px,14vw)"' : ''}>${esc(o.glyph)}</span>` : ''}
+      ${o.word ? `<span class="word">${esc(o.word)}</span>` : ''}${o.sub ? `<span class="sub">${esc(o.sub)}</span>` : ''}`;
+    $('#bigfx').appendChild(el);
+    if (o.sound) Sound.play(o.sound);
+    if (o.confetti) { const c = centerOf($('#bigfx')); burst(c.x, c.y, o.confetti === true ? 50 : o.confetti); }
+    setTimeout(() => el.remove(), 1500);
+    setTimeout(nextPop, popQueue.length > 1 ? 900 : 1300);
+  }
+
+  // ---------------- positions, flying cards, shakes
+  const arenaEl = () => $('#arena');
+  function centerOf(el) {
+    const a = arenaEl().getBoundingClientRect(), r = el.getBoundingClientRect();
+    return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height / 2 };
+  }
+  function seatEl(pid) {
+    if (S && pid === S.me) return $('#meInfo .frame') || $('#hand');
+    return document.querySelector(`.seat[data-pid="${pid}"] .frame`);
+  }
+  function stackEl(pid) {
+    if (S && pid === S.me) return $('#meInfo .stack') || $('#meInfo');
+    return document.querySelector(`.seat[data-pid="${pid}"] .stack`) || seatEl(pid);
+  }
+  function flyCard(fromEl, toEl, delay = 0, html = null) {
+    if (!fromEl || !toEl || !arenaEl().offsetWidth) return;
+    const from = centerOf(fromEl), to = centerOf(toEl);
+    const holder = document.createElement('div');
+    holder.innerHTML = html || `<div class="card">${back()}</div>`;
+    const el = holder.firstElementChild;
+    $('#flyLayer').appendChild(el);
+    const w = el.offsetWidth / 2, h = el.offsetHeight / 2;
+    const spin = (Math.random() * 40 - 20) | 0;
+    const anim = el.animate([
+      { transform: `translate(${from.x - w}px, ${from.y - h}px) rotate(-10deg) scale(1)`, opacity: 1 },
+      { transform: `translate(${(from.x + to.x) / 2 - w}px, ${Math.min(from.y, to.y) - h - 50}px) rotate(${spin + 180}deg) scale(1.1)`, opacity: 1, offset: 0.5 },
+      { transform: `translate(${to.x - w}px, ${to.y - h}px) rotate(${spin + 360}deg) scale(.55)`, opacity: 0.2 },
+    ], { duration: 520, delay, easing: 'cubic-bezier(.3,.7,.4,1)', fill: 'both' });
+    anim.onfinish = () => el.remove();
+  }
+  function shakeSeat(pid) {
+    const s = pid === S.me ? $('#meInfo') : document.querySelector(`.seat[data-pid="${pid}"]`);
+    if (!s) return;
+    s.classList.remove('shake'); void s.offsetWidth; s.classList.add('shake');
+    setTimeout(() => s.classList.remove('shake'), 600);
+  }
+  function floatMoney(pid, text, minus) {
+    const el0 = stackEl(pid); if (!el0) return;
+    const c = centerOf(el0);
+    const el = document.createElement('div');
+    el.className = 'float-money' + (minus ? ' minus' : '');
+    el.textContent = text; el.style.left = c.x + 'px'; el.style.top = c.y + 'px';
+    $('#flyLayer').appendChild(el); setTimeout(() => el.remove(), 1700);
+  }
+  function burst(x, y, count = 40) {
+    const b = document.createElement('div');
+    b.className = 'burst'; b.style.left = x + 'px'; b.style.top = y + 'px';
+    const cols = ['#f6c945', '#ff5a5f', '#5fe0cf', '#ffffff', '#7fd39a', '#b79cf0'];
+    for (let i = 0; i < count; i++) {
+      const p = document.createElement('i');
+      const ang = Math.random() * Math.PI * 2, dist = 120 + Math.random() * 260;
+      p.style.background = cols[i % cols.length];
+      p.style.setProperty('--dx', Math.cos(ang) * dist + 'px');
+      p.style.setProperty('--dy', Math.sin(ang) * dist + 'px');
+      p.style.setProperty('--rot', (Math.random() * 720 - 360) + 'deg');
+      p.style.animationDelay = (Math.random() * 0.15) + 's';
+      b.appendChild(p);
+    }
+    $('#flyLayer').appendChild(b);
+    setTimeout(() => b.remove(), 1600);
+  }
+  // floating gold coins in the background
+  (function makeShards() {
+    const box = $('#shards');
+    for (let i = 0; i < 18; i++) {
+      const sh = document.createElement('i');
+      sh.style.left = Math.random() * 100 + '%'; sh.style.top = 20 + Math.random() * 80 + '%';
+      const s = 8 + Math.random() * 12; sh.style.width = sh.style.height = s + 'px';
+      sh.style.animationDuration = 6 + Math.random() * 8 + 's'; sh.style.animationDelay = -Math.random() * 10 + 's';
+      box.appendChild(sh);
+    }
+  })();
+
   function onFx(e) {
     if (!S) return;
-    const name = (id) => esc((player(id) || {}).name || '?');
+    const nm = (id) => (player(id) || {}).name || '?';
+    const T = (t) => TYPES[t].name;
     switch (e.k) {
-      case 'deal': Sound.play('deal'); break;
-      case 'set': Sound.play('set'); break;
-      case 'discard': Sound.play('discard'); break;
+      case 'deal': {
+        Sound.play('deal');
+        setTimeout(() => {
+          const deck = $('#deckCard');
+          S.players.forEach((p, k) => { for (let r = 0; r < 4; r++) flyCard(deck, seatEl(p.id), r * 140 + k * 40); });
+        }, 60);
+        break;
+      }
+      case 'draw': {
+        setTimeout(() => {
+          const deck = $('#deckCard');
+          Object.entries(e.draws).forEach(([pid, n], k) => { for (let i = 0; i < Math.min(n, 4); i++) flyCard(deck, seatEl(pid), k * 90 + i * 110); });
+        }, 40);
+        break;
+      }
+      case 'set': {
+        Sound.play('set');
+        const from = e.fromDiscard ? $('#discardCard') : seatEl(e.pid);
+        setTimeout(() => { flyCard(from, stackEl(e.pid), 0, `<div class="card">${face(e.type)}</div>`); floatMoney(e.pid, '+' + fmt(e.value)); }, 30);
+        break;
+      }
+      case 'discard': {
+        Sound.play('discard');
+        setTimeout(() => flyCard(seatEl(e.pid), $('#discardCard'), 0, `<div class="card">${face(e.t)}</div>`), 30);
+        break;
+      }
       case 'join': Sound.play('join'); break;
-      case 'challenge':
-        Sound.play('challenge');
-        if (e.def === S.me) toast(`⚔️ <b>${name(e.att)}</b> is coming for your ${TYPES[e.type].name}!`, 'bad');
+      case 'challenge': {
+        const ring = $('#dirRing'); ring.classList.add('burst'); setTimeout(() => ring.classList.remove('burst'), 1200);
+        bigPop({ glyph: '⚔️', word: 'STEAL ATTEMPT!', sub: `${nm(e.att)} wants ${nm(e.def)}'s ${T(e.type)}`, cls: 'red shakey', sound: 'challenge' });
+        shakeSeat(e.def);
+        if (e.def === S.me) vibrate([100, 50, 100]);
         break;
-      case 'counter': Sound.play('counter'); break;
-      case 'steal':
-        if (e.winner === S.me) { Sound.play('steal'); bigFx(`SNATCHED!<small>+${fmt(e.value)} ${TYPES[e.type].name}</small>`, 'steal'); confetti(60); }
-        else if (e.loser === S.me) { Sound.play('robbed'); bigFx(`ROBBED!<small>${name(e.winner)} took your ${TYPES[e.type].name}</small>`, 'steal'); vibrate(250); }
-        else { Sound.play('steal'); bigFx(`STOLEN!<small>${name(e.winner)} took ${name(e.loser)}'s ${TYPES[e.type].name}</small>`, 'steal'); }
+      }
+      case 'counter': Sound.play('counter'); shakeSeat(e.pid); break;
+      case 'steal': {
+        const mine = e.winner === S.me, robbed = e.loser === S.me;
+        bigPop({ glyph: mine ? '💰' : '💸', word: mine ? 'SNATCHED!' : robbed ? 'ROBBED!' : 'STOLEN!',
+          sub: mine ? `+${fmt(e.value)} of ${T(e.type)}` : `${nm(e.winner)} took ${robbed ? 'your' : nm(e.loser) + "'s"} ${T(e.type)} · ${fmt(e.value)}`,
+          cls: 'red shakey', sound: robbed ? 'robbed' : 'steal', confetti: mine ? 70 : false });
+        shakeSeat(e.loser);
+        setTimeout(() => { flyCard(stackEl(e.loser), stackEl(e.winner), 0, `<div class="card">${face(e.type)}</div>`); floatMoney(e.winner, '+' + fmt(e.value)); floatMoney(e.loser, '−' + fmt(e.value), true); }, 200);
+        if (robbed) vibrate(250);
         break;
+      }
       case 'defended':
-        Sound.play('defended');
-        bigFx(`DEFENDED!<small>${name(e.winner)} kept the ${TYPES[e.type].name} · ${fmt(e.value)}</small>`, 'def');
+        bigPop({ glyph: '🛡️', word: 'DEFENDED!', sub: `${nm(e.winner)} kept the ${T(e.type)} · now ${fmt(e.value)}`, cls: 'blue', sound: 'defended' });
+        shakeSeat(e.loser);
         break;
       case 'roundend': Sound.play('roundEnd'); break;
-      case 'win': Sound.play('win'); confetti(e.pid === S.me ? 260 : 120); break;
+      case 'win': {
+        const iWon = e.pid === S.me;
+        bigPop({ glyph: iWon ? '🏆' : '★', word: iWon ? 'YOU WIN!' : `${nm(e.pid)} WINS!`, sub: 'First to the money!', sound: 'win', confetti: 120 });
+        break;
+      }
     }
   }
 
@@ -328,7 +454,6 @@
   function showScreen(id) {
     for (const s of ['home', 'lobby', 'game']) $('#' + s).classList.toggle('hidden', s !== id);
     document.body.classList.toggle('in-game', id === 'game');
-    if (id !== 'game') document.body.classList.remove('my-turn');
   }
   function render() {
     if (!S) { showScreen('home'); paintProfile(); return; }
@@ -354,7 +479,7 @@
     if (!chatOpen() && innerWidth >= 1100 && !store.get('ss_chatClosed', false)) setChat(true);
   }
 
-  function stackHTML(p, opts = {}) {
+  function stackHTML(p) {
     if (!p.stack.length) return `<div class="stack empty">No sets yet</div>`;
     const top = p.stack[p.stack.length - 1];
     const key = p.stack.length + ':' + top.cards.map((c) => c.id).join(',');
@@ -366,44 +491,84 @@
     return `<div class="stack" data-stack="${p.id}">${underHTML}<div class="top ${fresh ? 'fresh' : ''}">${top.cards.map(miniHTML).join('')}</div>
       <span class="val">${short(top.value)}</span>${safe}</div>`;
   }
+  function frameHTML(p, cls) {
+    const url = avatars[p.id];
+    const inner = url ? `<img src="${url}" alt="">` : esc(p.emoji || (p.name || '?')[0].toUpperCase());
+    return `<div class="frame ${cls || ''} ${p.connected ? '' : 'offline'}"><div class="av" style="background:${hue(p.name)}">${inner}</div></div>`;
+  }
 
   function stealTargetsFor(card) {
     const m = me(); if (!m || !card || m.stack.length < 1) return [];
     return S.players.filter((q) => q.id !== m.id && q.stack.length >= 2 && (isWild(card) || q.stack[q.stack.length - 1].type === card.t));
   }
+  // players whose top set matches this card but whose only set is still "safe"
+  function safeMatchesFor(card) {
+    const m = me(); if (!m || !card) return [];
+    return S.players.filter((q) => q.id !== m.id && q.stack.length === 1 && (isWild(card) || q.stack[0].type === card.t));
+  }
+
+  const SLOTS = { 1: ['top'], 2: ['tl', 'tr'], 3: ['left', 'top', 'right'], 4: ['left', 'tl', 'tr', 'right'], 5: ['left', 'tl', 'top', 'tr', 'right'] };
+  function slotPos(slot) {
+    const narrow = arenaEl().clientWidth < 700;
+    const P = narrow
+      ? { left: [22, 33, 'left'], tl: [27, 12, 'top'], top: [50, 12, 'top'], tr: [73, 12, 'top'], right: [78, 33, 'right'] }
+      : { left: [11, 40, 'left'], tl: [29, 15, 'top'], top: [50, 13, 'top'], tr: [71, 15, 'top'], right: [89, 40, 'right'] };
+    return P[slot];
+  }
+  function activeId() {
+    if (!S || S.state !== 'playing') return null;
+    return S.challenge ? S.challenge.toRespond : S.turnId;
+  }
 
   function renderGame() {
     const m = me();
     const ch = S.challenge;
-    document.body.classList.toggle('my-turn', myTurn() || iRespond());
+    const fight = iRespond();
+    arenaEl().classList.toggle('my-turn', myTurn());
+    arenaEl().classList.toggle('fight', !!fight);
     $('#tbRoom').textContent = 'Room ' + S.code;
     $('#tbRound').textContent = 'Round ' + S.round + (S.settings.target ? ` · to ${short(S.settings.target)}` : ' · single round');
     const cp = player(S.turnId);
-    $('#turnStrip').innerHTML = S.state !== 'playing' ? 'Round over'
+    const pill = $('#turnStrip');
+    pill.className = 'turn-pill' + (myTurn() ? ' mine' : fight ? ' fight' : '');
+    pill.innerHTML = S.state !== 'playing' ? 'Round over'
+      : fight ? (ch.defender === S.me ? '🛡️ DEFEND YOUR SET!' : '⚔️ FIGHT BACK!')
       : ch ? `⚔️ ${esc(player(ch.attacker).name)} vs ${esc(player(ch.defender).name)}`
-      : S.turnId === S.me ? `<span class="me">⭐ Your turn — make a move!</span>` : `${esc(cp ? cp.name : '')}'s turn…`;
+      : myTurn() ? '🟡 YOUR TURN!' : `${esc(cp ? cp.name : '')}'s turn…`;
 
-    // opponents in turn order starting after me
+    // seats around the table, in turn order starting after me
     const idx = S.players.findIndex((p) => p.id === S.me);
     const others = S.players.slice(idx + 1).concat(S.players.slice(0, idx));
     const selCard = selected.length === 1 ? S.hand.find((c) => c.id === selected[0]) : null;
     const targets = myTurn() && selCard ? new Set(stealTargetsFor(selCard).map((q) => q.id)) : new Set();
-    $('#opponents').innerHTML = others.map((p) => {
-      const turn = S.turnId === p.id && S.state === 'playing';
-      return `<div class="seat ${turn ? 'turn' : ''} ${targets.has(p.id) ? 'stealable' : ''} ${p.connected ? '' : 'offline'}" data-seat="${p.id}">
-        <div class="seat-head">${avatarHTML(p)}<div class="nm">${esc(p.name)}</div>${p.bot ? '🤖' : ''}${!p.connected && !p.bot ? '<span title="Offline — autopilot">📴</span>' : ''}${p.id === S.hostId ? '👑' : ''}</div>
-        ${turn ? `<div class="thinking">${ch ? 'in a showdown…' : 'thinking…'} <span data-cd></span></div>` : ''}
-        <div class="seat-hand">${'<i></i>'.repeat(p.handCount)}</div>
-        ${stackHTML(p)}
-        <div class="score-line"><span>Stack <b>${short(p.stackValue)}</b></span><span>Bank <b>${short(p.total)}</b></span></div>
-        ${targets.has(p.id) ? `<button class="btn sm steal" style="width:100%;margin-top:6px" data-steal="${p.id}">🦹 Steal this!</button>` : ''}
+    const actId = activeId();
+    const slots = SLOTS[Math.min(others.length, 5)] || [];
+    $('#seats').innerHTML = others.map((p, i) => {
+      const [x, y, side] = slotPos(slots[i]);
+      const turn = actId === p.id;
+      const inFight = ch && (ch.attacker === p.id || ch.defender === p.id);
+      const tags = [
+        turn ? (ch ? '<span class="tag fight">⚔️ ANSWERING</span>' : '<span class="tag turn">▶ THEIR TURN</span>') : '',
+        p.bot ? '<span class="tag">🤖 bot</span>' : '',
+        p.id === S.hostId ? '<span class="tag">👑 host</span>' : '',
+        !p.connected && !p.bot ? '<span class="tag">📴 autopilot</span>' : '',
+      ].join('');
+      return `<div class="seat side-${side} ${targets.has(p.id) ? 'stealable' : ''}" data-pid="${p.id}" data-seat="${p.id}" style="left:${x}%;top:${y}%">
+        <div class="seat-row">
+          <div><div class="banner">${esc(p.name)}</div>${frameHTML(p, turn ? (ch ? 'fight' : 'turn') : inFight ? 'fight' : '')}</div>
+          <div class="count-badge"><span class="mc">${p.handCount}</span></div>
+        </div>
+        <div class="seat-tags">${tags}</div>
+        <div class="seat-box">${stackHTML(p)}
+          <div class="score-line"><span>Stack <b>${short(p.stackValue)}</b></span><span>Bank <b>${short(p.total)}</b></span></div></div>
+        ${targets.has(p.id) ? `<button class="btn sm steal steal-btn" data-steal="${p.id}">🦹 Steal!</button>` : ''}
       </div>`;
     }).join('');
 
-    // piles
-    $('#deckCard').innerHTML = back();
+    // center piles
+    $('#deckCard').innerHTML = back(); $('#deckS2').innerHTML = back(); $('#deckS3').innerHTML = back();
     $('#deckCount').textContent = S.deckCount;
-    $('#deckCard').style.opacity = S.deckCount ? 1 : 0.25;
+    $('#deckPile').style.opacity = S.deckCount ? 1 : 0.3;
     const top = S.discardTop;
     $('#discardCard').innerHTML = top ? face(top.t) : '';
     $('#discardCard').classList.toggle('slot', !top);
@@ -411,22 +576,41 @@
     $('#discardCard').classList.toggle('glow', !!discardMatch);
     $('#discardCard').title = discardMatch ? 'Tap to pair this with your matching card' : '';
 
-    // log
-    $('#logList').innerHTML = S.log.slice(-6).map((l) => `<li class="${l.kind}">${esc(l.text)}</li>`).join('');
+    // status line + log
+    const last = S.log[S.log.length - 1];
+    $('#status').innerHTML = discardMatch ? '✨ Tap the <b>glowing discard</b> to grab it into a set!' : last ? esc(last.text) : '';
+    $('#logList').innerHTML = S.log.slice(-3, -1).map((l) => `<li class="${l.kind}">${esc(l.text)}</li>`).join('');
 
-    // arena
-    renderArena();
+    renderShowdown();
 
-    // me
-    $('#meInfo').innerHTML = `${avatarHTML(m, 'lg')}<div><div class="nm">${esc(m.name)} ${S.hostId === m.id ? '👑' : ''}</div>
-      <div class="money">${fmt(m.stackValue)} <span class="muted" style="font-size:13px">this round · ${fmt(m.total)} banked</span></div></div>${stackHTML(m)}`;
+    // my seat
+    const myFrame = actId === S.me ? (ch ? 'fight' : 'turn') : '';
+    $('#meInfo').innerHTML = `<div><div class="banner">${esc(m.name)} ${S.hostId === m.id ? '👑' : ''}</div>${frameHTML(m, myFrame)}</div>
+      <div class="seat-box">${stackHTML(m)}<div class="score-line"><span>Stack <b>${fmt(m.stackValue)}</b></span><span>Bank <b>${short(m.total)}</b></span></div></div>`;
 
     renderHand();
     renderActions();
+    requestAnimationFrame(renderPointer);
   }
 
-  function renderArena() {
-    const ch = S.challenge, el = $('#arena');
+  let pointerAng = 90;
+  function renderPointer() {
+    const ptr = $('#pointer');
+    const pid = activeId();
+    const el = pid && seatEl(pid);
+    if (!el || !S || S.state !== 'playing') { ptr.classList.add('off'); return; }
+    const c = centerOf($('#center')), t = centerOf(el);
+    let ang = Math.atan2(t.y - c.y, t.x - c.x) * 180 / Math.PI;
+    while (ang - pointerAng > 180) ang -= 360;
+    while (ang - pointerAng < -180) ang += 360;
+    pointerAng = ang;
+    ptr.style.setProperty('--ang', ang + 'deg');
+    ptr.classList.toggle('red', !!S.challenge);
+    ptr.classList.remove('off');
+  }
+
+  function renderShowdown() {
+    const ch = S.challenge, el = $('#showdown');
     if (!ch) { el.classList.add('hidden'); el.innerHTML = ''; return; }
     el.classList.remove('hidden');
     const att = player(ch.attacker), def = player(ch.defender);
@@ -439,14 +623,13 @@
         <div class="side ${ch.toRespond === def.id ? 'active' : ''}"><span>${esc(def.name)}</span>${avatarHTML(def)}</div></div>
       <div class="battle"><div class="prize">${ch.setCards.map(miniHTML).join('')}</div>
         <div class="played">${ch.played.map((x) => `<div class="pc">${miniHTML(x.card)}<span>${esc(player(x.pid).name.split(' ')[0])}</span></div>`).join('')}</div></div>
-      <div class="status ${mine ? 'me' : ''}">${mine
+      <div class="status-line ${mine ? 'me' : ''}">${mine
         ? `Play a ${TYPES[ch.type].name} or a wild to ${ch.defender === S.me ? 'keep' : 'take'} it — or give up.`
         : `Waiting for ${esc(resp.name)} to answer…`} &nbsp;Pot: <b>${fmt(pot)}</b></div>
       <div class="timerbar"><i data-bar></i></div>`;
   }
 
   function cardHints() {
-    // which hand cards can pair / steal right now
     const hints = {};
     if (!myTurn()) return hints;
     const m = me(), top = S.discardTop;
@@ -477,6 +660,30 @@
       return `<div class="card ${cls.join(' ')}" data-id="${c.id}" title="${TYPES[c.t].name} · ${fmt(value(c))}">${chips}${face(c.t)}</div>`;
     }).join('');
     S.hand.forEach((c) => seenHand.add(c.id));
+    layoutHand();
+  }
+  // fan the hand into a gentle arc, squeezing it to fit
+  function layoutHand() {
+    const hand = $('#hand');
+    const cards = [...hand.querySelectorAll('.card')];
+    const n = cards.length; if (!n) return;
+    const W = hand.clientWidth - 24, cw = cards[0].offsetWidth || 70;
+    let gap = n > 1 ? Math.min(10, (W - n * cw) / (n - 1)) : 0;
+    gap = Math.max(-cw * 0.5, gap);
+    const half = Math.min(10, n * 1.8), step = n > 1 ? (2 * half) / (n - 1) : 0, drop = Math.min(14, n * 2.5);
+    const deck = $('#deckCard'), dc = deck ? centerOf(deck) : null;
+    cards.forEach((el, i) => {
+      el.style.marginLeft = i ? gap + 'px' : '';
+      const t = n > 1 ? (i / (n - 1)) * 2 - 1 : 0;
+      el.style.setProperty('--r', (i - (n - 1) / 2) * step + 'deg');
+      el.style.setProperty('--y', t * t * drop + 'px');
+      el.style.zIndex = i + 1;
+      if (el.classList.contains('new') && dc) {
+        const c = centerOf(el);
+        el.style.setProperty('--fx', (dc.x - c.x) + 'px'); el.style.setProperty('--fy', (dc.y - c.y) + 'px');
+        el.style.animationDelay = 120 + i * 80 + 'ms';
+      }
+    });
   }
 
   function renderActions() {
@@ -488,14 +695,14 @@
       if (iRespond()) {
         const c = sel[0];
         const ok = c && (isWild(c) || c.t === ch.type);
-        bar.innerHTML = `${ok ? `<button class="btn primary big" data-act="counter">🛡️ Play ${TYPES[c.t].name}</button>` : `<div class="hint">Tap a glowing card to fight back</div>`}
+        bar.innerHTML = `${ok ? `<button class="btn primary big" data-act="counter">🛡️ Play ${TYPES[c.t].name}</button>` : (S.hand.some((h) => isWild(h) || h.t === ch.type) ? `<div class="hint">Tap a glowing card to fight back</div>` : `<div class="hint">Nothing to fight back with</div>`)}
           <button class="btn ghost" data-act="giveup">🏳️ Give up</button> <span class="hint" data-cd></span>`;
       } else bar.innerHTML = `<div class="hint">Showdown in progress… <span data-cd></span></div>`;
       return;
     }
     if (!myTurn()) {
       const cp = player(S.turnId);
-      bar.innerHTML = `<div class="hint">Waiting for <b>${esc(cp ? cp.name : '')}</b>… <span data-cd></span> &nbsp;You can plan by tapping your cards.</div>`;
+      bar.innerHTML = `<div class="hint">Waiting for <b>${esc(cp ? cp.name : '')}</b>… <span data-cd></span></div>`;
       return;
     }
     const m = me(), top = S.discardTop;
@@ -510,9 +717,13 @@
       if (top && !isWild(top) && !isWild(c) && top.t === c.t) btns.push(`<button class="btn primary" data-act="discardPair">♻️ Pair with discard · ${fmt(value(c) * 2)}</button>`);
       const tg = stealTargetsFor(c);
       for (const q of tg.slice(0, 5)) { const s = q.stack[q.stack.length - 1]; btns.push(`<button class="btn steal" data-steal="${q.id}">🦹 Steal ${esc(q.name.split(' ')[0])}'s ${TYPES[s.type].short} · ${short(s.value)}</button>`); }
-      if (!tg.length && m.stack.length >= 1 && !isWild(c)) { /* no hint spam */ }
       btns.push(`<button class="btn" data-act="discard">🗑️ Discard</button>`);
-      if (m.stack.length < 1 && S.players.some((q) => q.id !== m.id && q.stack.length >= 2)) btns.push(`<span class="hint">Make your first set before you can steal.</span>`);
+      if (m.stack.length < 1 && S.players.some((q) => q.id !== m.id && q.stack.length >= 2 && (isWild(c) || q.stack[q.stack.length - 1].type === c.t))) {
+        btns.push(`<span class="hint">🔒 Make your first set before you can steal.</span>`);
+      } else if (!tg.length) {
+        const safeOnes = safeMatchesFor(c);
+        if (safeOnes.length) btns.push(`<span class="hint">🔒 ${esc(safeOnes[0].name.split(' ')[0])}'s first set is safe — they need 2 sets before you can steal.</span>`);
+      }
     } else {
       btns.push(`<div class="hint"><b>Your move:</b> tap 2 cards to make a set, or 1 card to steal / discard. <span data-cd></span></div>`);
     }
@@ -555,7 +766,7 @@
       case 'giveup': return socket.emit('respond', null, () => { selected = []; flashTitle(false); });
     }
   });
-  $('#opponents').addEventListener('click', (e) => {
+  $('#seats').addEventListener('click', (e) => {
     const s = e.target.closest('[data-steal]');
     if (s) return act({ kind: 'challenge', target: s.dataset.steal, card: selected[0] });
     const seat = e.target.closest('.seat.stealable');
@@ -647,7 +858,7 @@
     })();
   }
 
-  window.addEventListener('resize', () => { if (S && S.state !== 'lobby') renderGame(); });
+  window.addEventListener('resize', () => { if (S && S.state !== 'lobby' && S.state !== undefined) renderGame(); });
   $('#chatClose').addEventListener('click', () => store.set('ss_chatClosed', true));
   $('#chatToggle').addEventListener('click', () => store.set('ss_chatClosed', !chatOpen()));
   paintProfile();
