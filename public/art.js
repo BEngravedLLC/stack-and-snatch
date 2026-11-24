@@ -6,7 +6,7 @@
     stamps:   { name: 'Stamp Collection',        short: 'Stamps',       value: 5000,  c1: '#b79cf0', c2: '#6c4bb8', bg: '#efe8ff' },
     baseball: { name: 'Baseball Cards',          short: 'Baseball Cards', value: 5000, c1: '#ff8a7a', c2: '#c0392b', bg: '#ffe7e3' },
     stocks:   { name: 'Stocks',                  short: 'Stocks',       value: 10000, c1: '#6fb3f2', c2: '#1f62a8', bg: '#e3f0ff' },
-    coins:    { name: 'Coin Collection',         short: 'Coins',        value: 10000, c1: '#f2c96b', c2: '#a8741a', bg: '#fff3d6' },
+    plane:    { name: 'Private Plane',           short: 'Plane',        value: 10000, c1: '#9aa8ff', c2: '#3f4fc0', bg: '#e8f4ff' },
     bank:     { name: 'Bank Account',            short: 'Bank Account', value: 10000, c1: '#8fa6bf', c2: '#3b5068', bg: '#e8eef5' },
     auto:     { name: 'Classic Auto',            short: 'Classic Auto', value: 15000, c1: '#ffab6b', c2: '#c4581b', bg: '#ffeedd' },
     jewels:   { name: 'Jewels',                  short: 'Jewels',       value: 15000, c1: '#5fe0cf', c2: '#13887a', bg: '#dffaf6' },
@@ -114,24 +114,21 @@
       <rect x="28" y="30" width="58" height="20" rx="10" fill="#1db954"/>
       <path d="M38 45 l6 -9 l6 9 z" fill="#fff"/>
       <text x="68" y="45" text-anchor="middle" font-size="13" font-weight="800" fill="#fff" font-family="Fredoka,Arial">12%</text>`,
-    coins: () => {
-      let stack = '';
-      for (let i = 0; i < 6; i++) {
-        const y = 150 - i * 13;
-        stack += `<ellipse cx="62" cy="${y + 6}" rx="42" ry="13" fill="#b8860b"/><rect x="20" y="${y - 6}" width="84" height="12" fill="#e0a92a"/><ellipse cx="62" cy="${y - 6}" rx="42" ry="13" fill="#f6cf4f" stroke="#a8741a" stroke-width="2"/>`;
-      }
-      const star = (cx, cy, r) => {
-        let pts = '';
-        for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + (i * Math.PI) / 5; const rr = i % 2 ? r * 0.45 : r; pts += `${(cx + rr * Math.cos(a)).toFixed(1)},${(cy + rr * Math.sin(a)).toFixed(1)} `; }
-        return `<polygon points="${pts}" fill="#fff4c2" stroke="#a8741a" stroke-width="2"/>`;
-      };
-      return `${stack}
-        <circle cx="140" cy="86" r="44" fill="url(#coin)" stroke="#a8741a" stroke-width="4"/>
-        <circle cx="140" cy="86" r="34" fill="none" stroke="#a8741a" stroke-width="2" stroke-dasharray="3 4"/>
-        ${star(140, 86, 22)}
-        <circle cx="168" cy="140" r="20" fill="#d9dde3" stroke="#7d8794" stroke-width="3"/>
-        <text x="168" y="146" text-anchor="middle" font-size="15" font-weight="800" fill="#5b6470" font-family="Fredoka,Arial">25</text>`;
-    },
+    plane: () => `
+      <ellipse cx="44" cy="42" rx="26" ry="11" fill="#fff"/><ellipse cx="60" cy="36" rx="18" ry="12" fill="#fff"/>
+      <ellipse cx="160" cy="132" rx="24" ry="9" fill="#fff"/><ellipse cx="146" cy="126" rx="15" ry="10" fill="#fff"/>
+      <path d="M38 150 Q100 128 168 146" fill="none" stroke="#b9c6ff" stroke-width="3" stroke-dasharray="6 7" stroke-linecap="round"/>
+      <g transform="rotate(-12 100 88)">
+        <path d="M70 78 L104 30 L120 30 L106 80 Z" fill="#3f4fc0" stroke="#252f80" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M34 80 L22 56 L34 56 L52 78 Z" fill="#e8453c" stroke="#9a1f18" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M28 82 Q30 70 52 70 L150 70 Q182 72 186 86 Q182 100 150 102 L52 102 Q30 102 28 90 Z" fill="#fdfdfd" stroke="#252f80" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M30 92 L184 92" stroke="#e8453c" stroke-width="5"/>
+        <path d="M150 72 Q172 74 180 84 L152 84 Z" fill="#8fd3ff" stroke="#252f80" stroke-width="2.5" stroke-linejoin="round"/>
+        ${[70, 88, 106, 124].map((x) => `<rect x="${x}" y="76" width="11" height="10" rx="3" fill="#8fd3ff" stroke="#252f80" stroke-width="2"/>`).join('')}
+        <path d="M84 98 L112 98 L96 140 L80 140 Z" fill="#3f4fc0" stroke="#252f80" stroke-width="3" stroke-linejoin="round"/>
+        <circle cx="187" cy="86" r="4" fill="#252f80"/>
+        <rect x="185" y="62" width="5" height="48" rx="2.5" fill="#5b6470" opacity=".75"/>
+      </g>`,
     bank: () => `
       <rect x="22" y="146" width="156" height="14" rx="3" fill="#8fa6bf"/>
       <rect x="32" y="134" width="136" height="14" rx="3" fill="#b4c4d6"/>
@@ -186,7 +183,7 @@
   // ---- full card face
   function face(t) {
     const d = TYPES[t];
-    const nameSize = d.name.length > 18 ? 15 : d.name.length > 12 ? 19 : 22;
+    const nameSize = d.name.length > 18 ? 19 : d.name.length > 12 ? 24 : 28;
     const wildBadge = d.wild
       ? `<g transform="translate(125 268)"><rect x="-44" y="-15" width="88" height="26" rx="13" fill="#1b1b2f"/><text y="5" text-anchor="middle" font-size="15" font-weight="700" letter-spacing="3" fill="${d.c1}" font-family="Fredoka,Arial">WILD</text></g>`
       : '';
@@ -194,12 +191,12 @@
       <rect x="2" y="2" width="246" height="346" rx="20" fill="#fffdf7" stroke="#00000022" stroke-width="2"/>
       <rect x="10" y="10" width="230" height="330" rx="14" fill="url(#fr-${t})"/>
       <rect x="20" y="52" width="210" height="196" rx="12" fill="${d.bg}" stroke="#ffffff" stroke-width="4"/>
-      <text x="125" y="40" text-anchor="middle" font-size="${nameSize}" font-weight="700" fill="#fff" font-family="Fredoka,Arial" stroke="#00000030" stroke-width="3" paint-order="stroke">${d.name}</text>
+      <text x="125" y="41" text-anchor="middle" ${d.name.length > 18 ? 'textLength="214" lengthAdjust="spacingAndGlyphs"' : ''} font-size="${nameSize}" font-weight="700" fill="#fff" font-family="Fredoka,Arial" stroke="#00000030" stroke-width="3" paint-order="stroke">${d.name}</text>
       <g transform="translate(25 66)">${art[t]()}</g>
       ${wildBadge}
       <g transform="translate(125 ${d.wild ? 312 : 296})">
         <rect x="-82" y="-26" width="164" height="44" rx="22" fill="#fff" stroke="${d.c2}" stroke-width="4"/>
-        <text y="8" text-anchor="middle" font-size="27" font-weight="700" fill="${d.c2}" font-family="Fredoka,Arial">${fmt(d.value)}</text>
+        <text y="8" text-anchor="middle" font-size="30" font-weight="700" fill="${d.c2}" font-family="Fredoka,Arial">${fmt(d.value)}</text>
       </g>
       <text x="24" y="${d.wild ? 270 : 330}" font-size="13" font-weight="800" fill="#ffffffcc" font-family="Fredoka,Arial">${short(d.value)}</text>
     </svg>`;
