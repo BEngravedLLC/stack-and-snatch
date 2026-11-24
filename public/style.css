@@ -181,6 +181,8 @@ body.chat-open #game { right: var(--chatw); }
 .stack .top { display: flex; position: relative; }
 .stack .top .card { margin-right: calc(var(--mw) * -0.55); }
 .stack .top .card:last-child { margin-right: 0; }
+.stack .top .cnt { position: absolute; left: -8px; top: -10px; z-index: 3; background: var(--red); color: #fff; font-family: Fredoka; font-weight: 700; font-size: 14px; padding: 1px 7px; border-radius: 999px; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+.seat-box { max-width: 270px; }
 .stack .top.fresh { animation: pop .5s cubic-bezier(.2,1.6,.5,1); }
 .stack .val { font-family: Fredoka; font-weight: 600; font-size: 16px; background: rgba(0,0,0,.35); padding: 2px 6px; border-radius: 8px; white-space: nowrap; align-self: center; }
 .stack .lock { font-size: 13px; color: var(--muted); align-self: center; }
