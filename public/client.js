@@ -488,7 +488,9 @@
     const under = p.stack.length - 1;
     const underHTML = under ? `<div class="under">${Array.from({ length: Math.min(under, 4) }, (_, i) => `<i style="transform:translate(${i * 3}px,${-i * 2}px) rotate(${i % 2 ? 90 : 84}deg)"></i>`).join('')}<b>+${under}</b></div>` : '';
     const safe = p.stack.length < 2 ? `<span class="lock" title="A player's first set can't be stolen">🔒 safe</span>` : '';
-    return `<div class="stack" data-stack="${p.id}">${underHTML}<div class="top ${fresh ? 'fresh' : ''}">${top.cards.map(miniHTML).join('')}</div>
+    const shown = top.cards.length > 4 ? top.cards.slice(-4) : top.cards;
+    const cnt = top.cards.length > 4 ? `<span class="cnt">×${top.cards.length}</span>` : '';
+    return `<div class="stack" data-stack="${p.id}">${underHTML}<div class="top ${fresh ? 'fresh' : ''}">${shown.map(miniHTML).join('')}${cnt}</div>
       <span class="val">${short(top.value)}</span>${safe}</div>`;
   }
   function frameHTML(p, cls) {
